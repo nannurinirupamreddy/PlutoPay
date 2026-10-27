@@ -28,8 +28,13 @@ public class Backend implements Serializable {
         if (!users.isEmpty()) {
             for (User user : users) {
                 if (user.getEmail().equals(email)){
-                    if (user.getPassword().equals(password)){
+                    if (PasswordHasher.verify(password, user.getPassword())){
                         loggedInUser = user;
+                        // Accounts saved before hashing existed get upgraded on their next login.
+                        if (!PasswordHasher.isHashed(user.getPassword())) {
+                            user.setPassword(PasswordHasher.hash(password));
+                            saveData();
+                        }
                         return true;
                     }
                 }
@@ -39,11 +44,20 @@ public class Backend implements Serializable {
         return false;
     }
 
+    private boolean emailTaken(String email) {
+        for (User user : users) {
+            if (user.getEmail().equalsIgnoreCase(email)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public boolean registerUser(String name, String email, String password) throws IOException {
-        if (userExists(email, password)) {
+        if (emailTaken(email)) {
             return false;
         }
-        loggedInUser = new User(name, email, password);
+        loggedInUser = new User(name, email, PasswordHasher.hash(password));
         users.add(loggedInUser);
         writer = new FileWriter("latestAccountID.txt");
         writer.write(String.valueOf(loggedInUser.getAccountID()));
@@ -329,12 +343,12 @@ public class Backend implements Serializable {
     }
 
     public void resetPassword(String newPassword) {
-        loggedInUser.setPassword(newPassword);
+        loggedInUser.setPassword(PasswordHasher.hash(newPassword));
         saveData();
     }
 
     public boolean passwordMatches(String password) {
-        return loggedInUser.getPassword().equals(password);
+        return PasswordHasher.verify(password, loggedInUser.getPassword());
     }
 
     public void viewCardDetails() {
@@ -379,7 +393,13 @@ public class Backend implements Serializable {
     }
 
     public boolean pinMatches(String pin) {
-        return loggedInUser.getPin().equals(pin);
+        boolean ok = PasswordHasher.verify(pin, loggedInUser.getPin());
+        // PINs saved before hashing existed get upgraded the first time they're used.
+        if (ok && !PasswordHasher.isHashed(loggedInUser.getPin())) {
+            loggedInUser.setPin(PasswordHasher.hash(pin));
+            saveData();
+        }
+        return ok;
     }
 
     public boolean isPinSet() {
@@ -387,7 +407,7 @@ public class Backend implements Serializable {
     }
 
     public void setPin(String pin) {
-        loggedInUser.setPin(pin);
+        loggedInUser.setPin(PasswordHasher.hash(pin));
         saveData();
     }
 

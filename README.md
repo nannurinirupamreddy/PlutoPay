@@ -16,6 +16,7 @@ PlutoPay is a console-based Java application that simulates a secure peer-to-pee
 - 👁 **View Transactions**: Complete history of past transactions.
 - 📄 **JSON Data Persistence**: User data is stored in `users.json`; no serialization is used.
 - 📌 **PIN Verification**: Set and validate PINs for secure payments.
+- 🔒 **Hashed Credentials**: Passwords and PINs are stored as salted PBKDF2-SHA256 hashes, never as plain text. Older plain-text accounts are upgraded automatically on their next login.
 
 ---
 
