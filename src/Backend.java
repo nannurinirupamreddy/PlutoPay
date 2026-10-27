@@ -67,7 +67,40 @@ public class Backend implements Serializable {
         return true;
     }
 
+    /** Money amounts must be real, positive numbers; negative or NaN amounts would move money backwards. */
+    static boolean isValidAmount(double amount) {
+        return Double.isFinite(amount) && amount > 0;
+    }
+
+    /**
+     * Moves money between two accounts atomically, so concurrent transfers never lose or create money.
+     * Both accounts are locked in account-ID order, which prevents deadlock when two transfers
+     * run in opposite directions (A to B and B to A) at the same time.
+     */
+    static boolean transfer(User from, User to, double amount) {
+        if (from == to || !isValidAmount(amount)) {
+            return false;
+        }
+        User first = from.getAccountID() < to.getAccountID() ? from : to;
+        User second = first == from ? to : from;
+        synchronized (first) {
+            synchronized (second) {
+                if (from.getBalance() < amount) {
+                    return false;
+                }
+                from.setBalance(from.getBalance() - amount);
+                to.setBalance(to.getBalance() + amount);
+                return true;
+            }
+        }
+    }
+
     public void payUser(long accountID, double amount, String description) {
+        if (!isValidAmount(amount)) {
+            System.out.println();
+            System.out.println("Enter an amount greater than 0!");
+            return;
+        }
         if (accountID == loggedInUser.getAccountID()) {
             System.out.println();
             System.out.println("You cannot pay yourself!");
@@ -80,8 +113,11 @@ public class Backend implements Serializable {
         }
         for (User user : users) {
             if (user.getAccountID() == accountID) {
-                loggedInUser.setBalance(loggedInUser.getBalance() - amount);
-                user.setBalance(user.getBalance() + amount);
+                if (!transfer(loggedInUser, user, amount)) {
+                    System.out.println();
+                    System.out.println("Insufficient balance!");
+                    return;
+                }
                 Transaction paidTransaction =
                         new Transaction(loggedInUser.getAccountID(),
                                 loggedInUser.getName(), user.getAccountID(),
@@ -269,6 +305,11 @@ public class Backend implements Serializable {
     }
 
     public void requestMoney(long requesterID, double amount, String description) {
+        if (!isValidAmount(amount)) {
+            System.out.println();
+            System.out.println("Enter an amount greater than 0!");
+            return;
+        }
         // check no elements in list
         if (requesterID == loggedInUser.getAccountID()) {
             System.out.println();
@@ -337,9 +378,15 @@ public class Backend implements Serializable {
         saveData();
     }
 
-    public void addBalance(double amount) {
-        loggedInUser.setBalance(loggedInUser.getBalance() + amount);
+    public boolean addBalance(double amount) {
+        if (!isValidAmount(amount)) {
+            return false;
+        }
+        synchronized (loggedInUser) {
+            loggedInUser.setBalance(loggedInUser.getBalance() + amount);
+        }
         saveData();
+        return true;
     }
 
     public void resetPassword(String newPassword) {
@@ -433,6 +480,11 @@ public class Backend implements Serializable {
 
     private void payWithSharedCard(SharedCard sharedCard, double amount,
                                    long toPayToAccountID, String description) {
+        if (!isValidAmount(amount)) {
+            System.out.println();
+            System.out.println("Enter an amount greater than 0!");
+            return;
+        }
         User payingUser = null;
         User receivingUser = null;
         for (User user : users) {
@@ -450,10 +502,8 @@ public class Backend implements Serializable {
                         "shared card owner account!");
                 return;
             }
-            if (payingUser.getBalance() >= amount) {
-                payingUser.setBalance(payingUser.getBalance() - amount);
+            if (transfer(payingUser, receivingUser, amount)) {
                 payingUser.setRewardAmount(payingUser.getRewardAmount() + rewardsCalculator(amount));
-                receivingUser.setBalance(receivingUser.getBalance() + amount);
                 sharedCard.setCardUsageLimit(sharedCard.getCardUsageLimit() - 1);
                 if (sharedCard.getCardUsageLimit() <= 0) {
                     loggedInUser.getSharedCards().remove(sharedCard);

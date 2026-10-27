@@ -242,7 +242,11 @@ public class App implements Serializable {
                                                 "add: ");
                                         double balance = scanner.nextDouble();
                                         scanner.nextLine();
-                                        backend.addBalance(balance);
+                                        if (!backend.addBalance(balance)) {
+                                            System.out.println();
+                                            System.out.println("Enter an amount greater than 0!");
+                                            break;
+                                        }
                                         System.out.println();
                                         System.out.println("✔️ Successfully " +
                                                 "added money to your account!" +

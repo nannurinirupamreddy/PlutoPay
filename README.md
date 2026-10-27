@@ -17,6 +17,7 @@ PlutoPay is a console-based Java application that simulates a secure peer-to-pee
 - 📄 **JSON Data Persistence**: User data is stored in `users.json`; no serialization is used.
 - 📌 **PIN Verification**: Set and validate PINs for secure payments.
 - 🔒 **Hashed Credentials**: Passwords and PINs are stored as salted PBKDF2-SHA256 hashes, never as plain text. Older plain-text accounts are upgraded automatically on their next login.
+- 🧵 **Thread-Safe Transfers**: Every payment goes through one transfer method that locks both accounts in account-ID order, so concurrent payments never lose or create money and never deadlock. Negative, zero, and NaN amounts are rejected on every payment path.
 
 ---
 
@@ -50,3 +51,14 @@ PlutoPay is a console-based Java application that simulates a secure peer-to-pee
    javac -cp .;json-simple-1.1.1.jar Main.java
 
 # 📌 Note: Ensure users.json and latestAccountID.txt are in the project root.
+
+---
+
+## ✅ Checks
+
+```bash
+./scripts/check.sh
+```
+
+Compiles the app and runs 13 checks, including a stress test of 200,000 transfers across 8 threads that verifies the total money in the system never changes and no account goes negative. GitHub Actions runs the same script on every push.
+
